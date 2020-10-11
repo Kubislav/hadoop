@@ -31,6 +31,7 @@ public class WordCount {
                 while(wordsFromLine.hasMoreTokens()){ // prechadzam kazde slovo v riadku
                     documentWord.set(wordsFromLine.nextToken()); //priradim slovo do documentWord
                     String tmp = documentWord.toString(); //z Text object menime documentWord na string aby bolo mozne porovnavat
+
                     if(tmp.equals("<http://rdf.freebase.com/ns/m.084x28q>")) // porovnanie...neskor by bolo potrebe priradit REGEX
                     context.write(documentLine, one); // ak dane slovo je najdene zapiseme CELY RIADOK kde sa slovo nachadza nie len slovo
                 }
