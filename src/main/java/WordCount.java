@@ -16,14 +16,24 @@ public class WordCount {
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable>{
 
         private final static IntWritable one = new IntWritable(1);
-        private Text word = new Text();
+        private Text documentLine = new Text();
+        private Text documentWord = new Text();
 
-        public void map(Object key, Text value, Context context
-        ) throws IOException, InterruptedException {
-            StringTokenizer itr = new StringTokenizer(value.toString(), "\n", false);
-            while (itr.hasMoreTokens()) {
-                word.set(itr.nextToken());
-                context.write(word, one);
+        public void map(Object key, Text wholeDocument, Context context) throws IOException, InterruptedException {
+
+            StringTokenizer documentLines = new StringTokenizer(wholeDocument.toString(), "\n", false); //rozdelim file na riadky
+
+            while (documentLines.hasMoreTokens()) { //prechadzam vsetky riadky
+
+                documentLine.set(documentLines.nextToken()); //priradim riadok do documentLine
+                StringTokenizer wordsFromLine = new StringTokenizer(documentLine.toString(), "\t", false); //rozdelim riadok na slova
+
+                while(wordsFromLine.hasMoreTokens()){ // prechadzam kazde slovo v riadku
+                    documentWord.set(wordsFromLine.nextToken()); //priradim slovo do documentWord
+                    String tmp = documentWord.toString(); //z Text object menime documentWord na string aby bolo mozne porovnavat
+                    if(tmp.equals("<http://rdf.freebase.com/ns/m.084x28q>")) // porovnanie...neskor by bolo potrebe priradit REGEX
+                    context.write(documentLine, one); // ak dane slovo je najdene zapiseme CELY RIADOK kde sa slovo nachadza nie len slovo
+                }
             }
         }
     }
