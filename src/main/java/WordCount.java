@@ -9,9 +9,16 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.List;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class WordCount {
+
+
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable>{
 
@@ -19,32 +26,85 @@ public class WordCount {
         private Text documentLine = new Text();
         private Text documentWord = new Text();
 
-        public void map(Object key, Text wholeDocument, Context context) throws IOException, InterruptedException {
+        public Hashtable<String, Integer> ID_table = new Hashtable<String, Integer>();
+        public List <StringTokenizer> listName = new ArrayList<>(20);
 
-            StringTokenizer documentLines = new StringTokenizer(wholeDocument.toString(), "\n", false); //rozdelim file na riadky
+        public String tmp = null;
+        public String[] longTmp = null;
+        public String tmpID = null;
+        public String longTmpID = null;
 
-            while (documentLines.hasMoreTokens()) { //prechadzam vsetky riadky
+        public int flagMatchGetInfoBelow = 0;
 
-                documentLine.set(documentLines.nextToken()); //priradim riadok do documentLine
-                StringTokenizer wordsFromLine = new StringTokenizer(documentLine.toString(), "\t", false); //rozdelim riadok na slova
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
-                while(wordsFromLine.hasMoreTokens()){ // prechadzam kazde slovo v riadku
-                    documentWord.set(wordsFromLine.nextToken()); //priradim slovo do documentWord
-                    String tmp = documentWord.toString(); //z Text object menime documentWord na string aby bolo mozne porovnavat
 
-                    if(tmp.equals("<http://rdf.freebase.com/ns/m.084x28q>")) // porovnanie...neskor by bolo potrebe priradit REGEX
-                    context.write(documentLine, one); // ak dane slovo je najdene zapiseme CELY RIADOK kde sa slovo nachadza nie len slovo
+            StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
+
+            if (flagMatchGetInfoBelow == 1){
+                tmp = wordsFromLine.nextToken();
+                longTmp = tmp.split("/");
+                tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
+
+                if(!tmpID.equals(longTmpID)){
+                    flagMatchGetInfoBelow = 0;
+                }else{
+                    documentWord = new Text(wordsFromLine.toString());
+                    context.write(documentWord, one);
+                }
+
+            }else
+            {
+                if(listName.size() == 20){
+                    listName.remove(0);
+                }
+                listName.add(wordsFromLine);
+
+
+                Pattern pattern = Pattern.compile("book.book_edition.(isbn)");
+                String riadok = value.toString();
+
+                Matcher matcher = pattern.matcher(riadok);
+
+                if(matcher.find()){
+                    String[] first = riadok.split("\t");
+                    String[] second = first[0].split("/");
+                    String ID = second[4].substring(0, second[4].length() - 1);
+                    //pridat vsetko nadtym
+
+                    for(int i = 0; i < listName.size(); i++){
+                        tmp = listName.get(i).nextToken();
+                        longTmp = tmp.split("/");
+                        tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
+
+                        if (tmpID.equals(ID)){
+                            documentWord = new Text(wordsFromLine.toString());
+                            context.write(documentWord, one);
+
+                        }
+
+                    }
+                    longTmpID = tmpID;
+                    flagMatchGetInfoBelow = 1;
                 }
             }
         }
+
+
     }
 
-    public static class IntSumReducer
-            extends Reducer<Text,IntWritable,Text,IntWritable> {
+    public static class printer{
+        public void printerMethod(){
+            System.out.println("GET FUCKED !");
+        }
+    }
+
+    public static class IntSumReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
 
     }
 
     public static void main(String[] args) throws Exception {
+
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf, "word count");
         job.setJarByClass(WordCount.class);
@@ -56,5 +116,6 @@ public class WordCount {
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
+
     }
 }
