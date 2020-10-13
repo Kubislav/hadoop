@@ -41,16 +41,26 @@ public class WordCount {
 
             StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
 
-            if (flagMatchGetInfoBelow == 1){
-                tmp = wordsFromLine.nextToken();
-                longTmp = tmp.split("/");
-                tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
+            if (flagMatchGetInfoBelow == 1 && wordsFromLine.hasMoreTokens()){
+                try{
+                    tmp = wordsFromLine.nextToken();
+                    longTmp = tmp.split("/");
+                    tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
 
-                if(!tmpID.equals(longTmpID)){
-                    flagMatchGetInfoBelow = 0;
-                }else{
-                    documentWord = new Text(wordsFromLine.toString());
-                    context.write(documentWord, one);
+                    if(!tmpID.equals(longTmpID)){
+                        flagMatchGetInfoBelow = 0;
+                    }else{
+                        String x = tmp;
+                        while(wordsFromLine.hasMoreTokens()){
+                            x = x + wordsFromLine.nextToken().toString();
+                        }
+                        documentWord = new Text(x);
+                        context.write(documentWord, one);
+                    }
+                }
+                catch (Exception e){
+                    System.out.println("VYPISUJEM DOLNE");
+                    System.out.println(e);
                 }
 
             }else
@@ -70,20 +80,36 @@ public class WordCount {
                     String[] first = riadok.split("\t");
                     String[] second = first[0].split("/");
                     String ID = second[4].substring(0, second[4].length() - 1);
-                    //pridat vsetko nadtym
 
-                    for(int i = 0; i < listName.size(); i++){
-                        tmp = listName.get(i).nextToken();
-                        longTmp = tmp.split("/");
-                        tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
+                    try {
 
-                        if (tmpID.equals(ID)){
-                            documentWord = new Text(wordsFromLine.toString());
-                            context.write(documentWord, one);
+                        for(int i = 0; i < listName.size(); i++){
+                            if(listName.get(i).hasMoreTokens()){
+                                tmp = listName.get(i).nextToken();
+                                longTmp = tmp.split("/");
+                                tmpID = longTmp[4].substring(0, longTmp[4].length() - 1);
+
+                                if (tmpID.equals(ID)){
+                                    String x = tmp;
+                                    while(listName.get(i).hasMoreTokens()){
+                                        x = x + listName.get(i).nextToken().toString();
+                                    }
+                                    documentWord = new Text(x);
+                                    context.write(documentWord, one);
+                                }
+                            }
+
 
                         }
-
                     }
+                    catch (Exception e){
+                        System.out.println("VYPISUJEM HORNE");
+                        System.out.println(e);
+                    }
+
+                    //pridat vsetko nadtym
+
+
                     longTmpID = tmpID;
                     flagMatchGetInfoBelow = 1;
                 }
