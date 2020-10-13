@@ -10,7 +10,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -18,15 +17,11 @@ import java.util.regex.Pattern;
 
 public class WordCount {
 
-
-
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable>{
 
         private final static IntWritable one = new IntWritable(1);
         private Text documentLine = new Text();
         private Text documentWord = new Text();
-
-        public Hashtable<String, Integer> ID_table = new Hashtable<String, Integer>();
         public List <StringTokenizer> listName = new ArrayList<>(25);
 
         public String tmp = null;
@@ -37,7 +32,6 @@ public class WordCount {
         public int flagMatchGetInfoBelow = 0;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-
 
             StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
 
@@ -70,7 +64,6 @@ public class WordCount {
                 }
                 listName.add(wordsFromLine);
 
-
                 Pattern pattern = Pattern.compile("book.book_edition.(isbn)");
                 String riadok = value.toString();
 
@@ -98,18 +91,12 @@ public class WordCount {
                                     context.write(documentWord, one);
                                 }
                             }
-
-
                         }
                     }
-                    catch (Exception e){
+                    catch (Exception e) {
                         System.out.println("VYPISUJEM HORNE");
                         System.out.println(e);
                     }
-
-                    //pridat vsetko nadtym
-
-
                     longTmpID = tmpID;
                     flagMatchGetInfoBelow = 1;
                 }
