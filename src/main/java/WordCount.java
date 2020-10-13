@@ -27,7 +27,7 @@ public class WordCount {
         private Text documentWord = new Text();
 
         public Hashtable<String, Integer> ID_table = new Hashtable<String, Integer>();
-        public List <StringTokenizer> listName = new ArrayList<>(20);
+        public List <StringTokenizer> listName = new ArrayList<>(25);
 
         public String tmp = null;
         public String[] longTmp = null;
@@ -65,7 +65,7 @@ public class WordCount {
 
             }else
             {
-                if(listName.size() == 20){
+                if(listName.size() == 25){
                     listName.remove(0);
                 }
                 listName.add(wordsFromLine);
