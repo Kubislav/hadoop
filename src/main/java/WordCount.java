@@ -108,7 +108,7 @@ public class WordCount {
 
     public static class printer{
         public void printerMethod(){
-            System.out.println("GET FUCKED !");
+            System.out.println("tester!");
         }
     }
 
