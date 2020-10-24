@@ -31,12 +31,6 @@ public class WordCount {
         public String longTmpID = null;
         public int flagMatchGetInfoBelow = 0;
 
-        String filename = "person_id.txt";
-        Writer out = new OutputStreamWriter(new FileOutputStream(filename, true), "UTF-8");
-
-        public TokenizerMapper() throws UnsupportedEncodingException, FileNotFoundException {
-        }
-
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
             StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
@@ -55,8 +49,6 @@ public class WordCount {
                     String[] second = first[0].split("/");
                     String ID = second[4].substring(0, second[4].length() - 1);
                     documentWord = new Text(ID);
-                    out.write(ID + "\n");
-                    out.close();
                     context.write(documentWord, one);
 
                 } catch (Exception e) {
@@ -82,7 +74,7 @@ public class WordCount {
 
         String foundID = null;
         boolean flagBookHere = false;
-        public String tmp = null;
+        public String badID = null;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
@@ -96,33 +88,38 @@ public class WordCount {
             String[] second = first[0].split("/");
             String ID = second[4].substring(0, second[4].length() - 1);
             ID = ID + "\t1";
+            if(!ID.equals(badID)){
+                if(flagBookHere && ID.equals(foundID)){
 
-            if(flagBookHere && ID.equals(foundID)){
+                    String x = wordsFromLine.nextToken();
+                    while(wordsFromLine.hasMoreTokens()){
+                        x = x + wordsFromLine.nextToken();
+                    }
 
-                String x = wordsFromLine.nextToken();
-                while(wordsFromLine.hasMoreTokens()){
-                    x = x + wordsFromLine.nextToken();
+                    context.write(new Text(x), one);
                 }
-
-                context.write(new Text(x), one);
-            }
-            else{
-                flagBookHere = false;
-                try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        if(line.equals(ID)){
-                            flagBookHere = true;
-                            foundID = ID;
-                            context.write(new Text(wordsFromLine.nextToken()), one);
-                            break;
+                else{
+                    flagBookHere = false;
+                    badID = ID;
+                    try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            if(line.equals(ID)){
+                                flagBookHere = true;
+                                foundID = ID;
+                                badID = null;
+                                context.write(new Text(wordsFromLine.nextToken()), one);
+                                break;
+                            }
                         }
+
+                    }
+                    catch (Exception e){
+                        System.out.println(e);
                     }
                 }
-                catch (Exception e){
-                    System.out.println(e);
-                }
             }
+
 
 
             /*if (matcher.find()) {
@@ -160,14 +157,8 @@ public class WordCount {
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         job.waitForCompletion(true);
-        try {
-            File myTestFile = new File(args[3]);
-            System.out.println("HEY");
 
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-
+        System.out.println("Prvy job hotovy");
         //druhy job
         Configuration conf2 = new Configuration();
         conf2.set("idFile", args[3]);
