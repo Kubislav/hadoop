@@ -8,7 +8,10 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -18,6 +21,7 @@ import java.util.regex.Pattern;
 public class WordCount {
 
 
+
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
 
         private final static IntWritable one = new IntWritable(1);
@@ -25,16 +29,8 @@ public class WordCount {
         private Text documentWord = new Text();
         public List<StringTokenizer> listName = new ArrayList<>(25);
 
-        public String tmp = null;
-        public String[] longTmp = null;
-        public String tmpID = null;
-        public String longTmpID = null;
-        public int flagMatchGetInfoBelow = 0;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-
-            StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
-
 
             Pattern pattern = Pattern.compile("book.book_edition.(isbn)");
             String riadok = value.toString();
@@ -43,12 +39,7 @@ public class WordCount {
 
             if (matcher.find()) {
                 try {
-
-
-                    String[] first = riadok.split("\t");
-                    String[] second = first[0].split("/");
-                    String ID = second[4].substring(0, second[4].length() - 1);
-                    documentWord = new Text(ID);
+                    documentWord = new Text(getID(value, false));
                     context.write(documentWord, one);
 
                 } catch (Exception e) {
@@ -82,29 +73,26 @@ public class WordCount {
 
             Configuration conf = context.getConfiguration();
             File idFile = new File(conf.get("idFile"));
-            String riadok = value.toString();
 
-            String[] first = riadok.split("\t");
-            String[] second = first[0].split("/");
-            String ID = second[4].substring(0, second[4].length() - 1);
-            ID = ID + "\t1";
-            if(!ID.equals(badID)){
-                if(flagBookHere && ID.equals(foundID)){
+            String ID = getID(value, true);
+
+            if (!ID.equals(badID)) {
+                if (flagBookHere && ID.equals(foundID)) {
 
                     String x = wordsFromLine.nextToken();
-                    while(wordsFromLine.hasMoreTokens()){
+                    while (wordsFromLine.hasMoreTokens()) {
                         x = x + wordsFromLine.nextToken();
                     }
-
                     context.write(new Text(x), one);
-                }
-                else{
+
+                } else {
+
                     flagBookHere = false;
                     badID = ID;
                     try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
                         String line;
                         while ((line = br.readLine()) != null) {
-                            if(line.equals(ID)){
+                            if (line.equals(ID)) {
                                 flagBookHere = true;
                                 foundID = ID;
                                 badID = null;
@@ -113,28 +101,12 @@ public class WordCount {
                             }
                         }
 
-                    }
-                    catch (Exception e){
+                    } catch (Exception e) {
                         System.out.println(e);
                     }
                 }
             }
 
-
-
-            /*if (matcher.find()) {
-                try {
-                    String[] first = riadok.split("\t");
-                    String[] second = first[0].split("/");
-                    String ID = second[4].substring(0, second[4].length() - 1);
-                    documentWord = new Text(ID);
-                    context.write(documentWord, one);
-
-                } catch (Exception e) {
-                    System.out.println(e);
-                }
-
-            }*/
         }
 
     }
@@ -143,10 +115,22 @@ public class WordCount {
 
     }
 
+    public static String getID(Text value, boolean extraTab){
+        String riadok = value.toString();
+        String[] first = riadok.split("\t");
+        String[] second = first[0].split("/");
+        String ID = second[4].substring(0, second[4].length() - 1);
+
+        if(extraTab)
+            ID = ID + "\t1";
+
+        return ID;
+    }
+
     public static void main(String[] args) throws Exception {
         //prvy job
         Configuration conf = new Configuration();
-
+        //conf.set("dfs.block.size", "41943040");
         Job job = Job.getInstance(conf, "FindIDs");
         job.setJarByClass(WordCount.class);
         job.setMapperClass(TokenizerMapper.class);
@@ -166,7 +150,7 @@ public class WordCount {
         Job job2 = Job.getInstance(conf2, "FindBooks");
         job2.setJarByClass(WordCount.class);
         job2.setMapperClass(FindBooks.class);
-        job2.setCombinerClass(BooksReducer.class);
+        job2.setCombinerClass(BooksReducer.class); // zakomentovat mozno
         job2.setReducerClass(BooksReducer.class);
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(IntWritable.class);
@@ -177,3 +161,6 @@ public class WordCount {
 
     }
 }
+
+
+//StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
