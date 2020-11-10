@@ -58,7 +58,7 @@ public class WordCount {
 
     public static class FindBooks extends Mapper<Object, Text, Text, IntWritable> {
         private final static IntWritable one = new IntWritable(1);
-        static final int pocetAtributov = 5;
+        static final int pocetAtributov = 4;
 
         final String[] listAttributes = new String[pocetAtributov];
         String foundID = null;
@@ -87,56 +87,50 @@ public class WordCount {
                         String parsed = value.toString();
                         String[] splittedAtr = parsed.split("\t");
 
-                        if(attributeValue == 1){ //meno
+                        if(attributeValue == 1 || attributeValue == 4 || attributeValue == 8){
                             Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
                             Matcher matcher = pattern.matcher(splittedAtr[2]);
+
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
-                            listAttributes[0] = "Meno: " + splittedAtr[2] + "<?!?>";
+
+                            if (attributeValue == 1)
+                                listAttributes[0] = "Meno: " + splittedAtr[2] + " <?!?>";
+                            else if (attributeValue == 4)
+                                listAttributes[3] = "ISBN: " +splittedAtr[2]+ " <?!?>";
+                            else if (attributeValue == 8)
+                                listAttributes[1] = "Autor: " +splittedAtr[2]+ " <?!?>";
                             notEmpty = true;
 
-                        }else if(attributeValue == 2){ //publication date
+                        }else{
                             Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
                             Matcher matcher = pattern.matcher(splittedAtr[2]);
+
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
-                                listAttributes[2] = "Rok vydania: " +splittedAtr[2]+ "<?!?>";
-                                notEmpty = true;
 
-                        }else if(attributeValue == 4){ //ISBN
-                            Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
-                            Matcher matcher = pattern.matcher(splittedAtr[2]);
-                            if (matcher.find())
-                                splittedAtr[2] = matcher.group(0);
-                                listAttributes[3] = "ISBN: " +splittedAtr[2]+ "<?!?>";
-                                notEmpty = true;
-
-                        }else if(attributeValue == 8){ //number_of_pages CUT ID !!!
-                            listAttributes[4] = "Pocet stran: " + getID(splittedAtr[2], false) + "<?!?>";
+                            listAttributes[2] = "Rok vydania: " +splittedAtr[2]+ " <?!?>";
                             notEmpty = true;
-                        }
-                        else{ // autor knihy
-                                Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
-                                Matcher matcher = pattern.matcher(splittedAtr[2]);
-                                if (matcher.find())
-                                    splittedAtr[2] = matcher.group(0);
-                                listAttributes[1] = "Autor: " +splittedAtr[2]+ "<?!?>";
-                                notEmpty = true;
                         }
                     }
 
                 } else {
                     if(notEmpty){
 
-                        for(int i = 0; i < pocetAtributov; i++){
-                            if(listAttributes[i] == null)
-                                x = x + "NOT_FOUND<?!?>";
-                            else
-                                x = x + listAttributes[i];
-                        }
-
-                        if(listAttributes[0] == null) // ak nema meno tak ho vylucim
+                        if(listAttributes[0] == null)
                             hasName = false;
+
+                        if(listAttributes[1] == null)
+                            listAttributes[1] = "Autor: NOT_FOUND <?!?>";
+
+                        if(listAttributes[2] == null)
+                            listAttributes[2] = "Rok vydania: NOT_FOUND <?!?>";
+
+                        if(listAttributes[3] == null)
+                            listAttributes[3] = "ISBN: NOT_FOUND <?!?>";
+
+                        for(int i = 0; i < pocetAtributov; i++)
+                            x = x + listAttributes[i];
 
                         for(int i = 0; i < pocetAtributov; i++) // vycistit pole
                             listAttributes[i] = null;
@@ -161,7 +155,6 @@ public class WordCount {
                                 flagBookHere = true;
                                 foundID = ID;
                                 badID = null;
-                                //context.write(new Text(wordsFromLine.nextToken()), one);
                                 break;
                             }
                         }
@@ -228,15 +221,10 @@ public class WordCount {
         if(matcherISBN.find())
             return 4;
 
-        Pattern numOfPages = Pattern.compile("book\\.*book_edition\\.*number_of_pages>");
-        Matcher matcherPages = numOfPages.matcher(stringValue);
-        if(matcherPages.find())
-            return 8;
-
         Pattern author = Pattern.compile("media_common\\.*creative_work\\.*credit>");
         Matcher matcherAuthor = author.matcher(stringValue);
         if(matcherAuthor.find())
-            return 16;
+            return 8;
 
         return 0;
     }
