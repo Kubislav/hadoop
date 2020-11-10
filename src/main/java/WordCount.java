@@ -109,6 +109,27 @@ public class WordCount {
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
 
+                            Pattern patternLongDate = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}");
+                            Matcher matcherLongDate = patternLongDate.matcher(splittedAtr[2]);
+
+                            Pattern pattern2 = Pattern.compile("[0-9]{4}-[012]{1}");
+                            Matcher matcher2 = pattern2.matcher(splittedAtr[2]);
+
+                            Pattern patternOther = Pattern.compile("[0-9]{4}-[3|4|5|6|7|8|9]{1}");
+                            Matcher matcherOther = patternOther.matcher(splittedAtr[2]);
+
+                            if(matcherLongDate.find()){
+                                splittedAtr[2] = splittedAtr[2].substring(0,4);
+                            }
+
+                            else if(matcher2.find()){
+                                splittedAtr[2] = splittedAtr[2].substring(0,4) + "-20"+ splittedAtr[2].substring(5,7);
+                            }
+
+                            else if(matcherOther.find()){
+                                splittedAtr[2] = splittedAtr[2].substring(0,4) + "-19"+ splittedAtr[2].substring(5,7);
+                            }
+
                             listAttributes[2] = "Rok vydania: " +splittedAtr[2]+ " <?!?>";
                             notEmpty = true;
                         }
