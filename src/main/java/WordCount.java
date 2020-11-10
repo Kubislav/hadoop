@@ -58,19 +58,21 @@ public class WordCount {
 
     public static class FindBooks extends Mapper<Object, Text, Text, IntWritable> {
         private final static IntWritable one = new IntWritable(1);
+        static final int pocetAtributov = 5;
 
-        public List<StringTokenizer> listName = new ArrayList<>(4);
-
+        final String[] listAttributes = new String[pocetAtributov];
         String foundID = null;
         boolean flagBookHere = false;
         public String badID = null;
         String x = null;
         int attributeValue = 0;
         int byteValue = 0;
+        boolean notEmpty = false;
+        boolean hasName = true;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
-            StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
+            //StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
 
             Configuration conf = context.getConfiguration();
             File idFile = new File(conf.get("idFile"));
@@ -78,7 +80,7 @@ public class WordCount {
             String ID = getID(value, true);
 
             if (!ID.equals(badID)) {
-                if (flagBookHere && ID.equals(foundID)) { //viem ze je to kniha chcem vybrane atributy
+                if (flagBookHere && ID.equals(foundID)) {
                     attributeValue = importantAttribute(value);
                     if(attributeValue != 0){
                         byteValue += attributeValue;
@@ -90,32 +92,68 @@ public class WordCount {
                             Matcher matcher = pattern.matcher(splittedAtr[2]);
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
+                            listAttributes[0] = "Meno: " + splittedAtr[2] + "<?!?>";
+                            notEmpty = true;
+
                         }else if(attributeValue == 2){ //publication date
                             Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
                             Matcher matcher = pattern.matcher(splittedAtr[2]);
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
+                                listAttributes[2] = "Rok vydania: " +splittedAtr[2]+ "<?!?>";
+                                notEmpty = true;
+
                         }else if(attributeValue == 4){ //ISBN
                             Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
                             Matcher matcher = pattern.matcher(splittedAtr[2]);
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
-                        }else{ //number_of_pages
+                                listAttributes[3] = "ISBN: " +splittedAtr[2]+ "<?!?>";
+                                notEmpty = true;
 
+                        }else if(attributeValue == 8){ //number_of_pages CUT ID !!!
+                            listAttributes[4] = "Pocet stran: " + getID(splittedAtr[2], false) + "<?!?>";
+                            notEmpty = true;
                         }
-                        x = x + "\t" + splittedAtr[2];
+                        else{ // autor knihy
+                                Pattern pattern = Pattern.compile("(?<=\\\")(.*?)(?=\\\")");
+                                Matcher matcher = pattern.matcher(splittedAtr[2]);
+                                if (matcher.find())
+                                    splittedAtr[2] = matcher.group(0);
+                                listAttributes[1] = "Autor: " +splittedAtr[2]+ "<?!?>";
+                                notEmpty = true;
+                        }
                     }
 
                 } else {
-                    if(x != null){
-                        x = x.replaceAll("null", "");
-                        context.write(new Text(x), one);
+                    if(notEmpty){
+
+                        for(int i = 0; i < pocetAtributov; i++){
+                            if(listAttributes[i] == null)
+                                x = x + "NOT_FOUND<?!?>";
+                            else
+                                x = x + listAttributes[i];
+                        }
+
+                        if(listAttributes[0] == null) // ak nema meno tak ho vylucim
+                            hasName = false;
+
+                        for(int i = 0; i < pocetAtributov; i++) // vycistit pole
+                            listAttributes[i] = null;
+
+                        if(hasName){
+                            x = x.replaceAll("null", "");
+                            context.write(new Text(x), one);
+                        }
+                        hasName = true;
                     }
+
                     byteValue = 0;
                     attributeValue = 0;
                     x = null;
                     flagBookHere = false;
                     badID = ID;
+                    notEmpty = false;
                     try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
                         String line;
                         while ((line = br.readLine()) != null) {
@@ -160,6 +198,18 @@ public class WordCount {
         return ID;
     }
 
+    public static String getID(String value, boolean extraTab){
+        String riadok = value.toString();
+        String[] first = riadok.split("\t");
+        String[] second = first[0].split("/");
+        String ID = second[4].substring(0, second[4].length() - 1);
+
+        if(extraTab)
+            ID = ID + "\t1";
+
+        return ID;
+    }
+
     public static int importantAttribute(Text value){
         String stringValue = value.toString();
         //MENO KNIHY
@@ -183,6 +233,11 @@ public class WordCount {
         if(matcherPages.find())
             return 8;
 
+        Pattern author = Pattern.compile("media_common\\.*creative_work\\.*credit>");
+        Matcher matcherAuthor = author.matcher(stringValue);
+        if(matcherAuthor.find())
+            return 16;
+
         return 0;
     }
 
@@ -199,11 +254,7 @@ public class WordCount {
             Configuration conf = context.getConfiguration();
             File beforeParseFile = new File(conf.get("beforeParseFile"));
             context.write(value, one);
-
-
         }
-
-
     }
 
 
@@ -235,15 +286,15 @@ public class WordCount {
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         job.waitForCompletion(true);
 
-        System.out.println("Prvy job hotovy");
-        //druhy job
+        System.out.println("First job done");
+
         Configuration conf2 = new Configuration();
         conf2.set("idFile", args[4]);
 
         Job job2 = Job.getInstance(conf2, "FindBooks");
         job2.setJarByClass(WordCount.class);
         job2.setMapperClass(FindBooks.class);
-        //job2.setCombinerClass(BooksReducer.class); // zakomentovat mozno
+        //job2.setCombinerClass(BooksReducer.class); //
         job2.setReducerClass(BooksReducer.class);
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(IntWritable.class);
@@ -251,15 +302,15 @@ public class WordCount {
         FileOutputFormat.setOutputPath(job2, new Path(args[2]));
         job2.waitForCompletion(true);
 
-        System.out.println("Druhy job hotovy");
-        //druhy job
+        System.out.println("Second job done");
+
         Configuration conf3 = new Configuration();
         conf3.set("beforeParseFile", args[5]);
 
         Job job3 = Job.getInstance(conf3, "getLinks");
         job3.setJarByClass(WordCount.class);
         job3.setMapperClass(getLinks.class);
-        //job2.setCombinerClass(BooksReducer.class); // zakomentovat mozno
+        //job2.setCombinerClass(BooksReducer.class); //
         job3.setReducerClass(LinksReducer.class);
         job3.setOutputKeyClass(Text.class);
         job3.setOutputValueClass(IntWritable.class);
@@ -267,7 +318,7 @@ public class WordCount {
         FileOutputFormat.setOutputPath(job3, new Path(args[3]));
         System.exit(job3.waitForCompletion(true) ? 0 : 1);
 
-        System.out.println("Treti job hotovy");
+        System.out.println("Third job done");
     }
 
 }
