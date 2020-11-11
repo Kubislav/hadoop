@@ -17,10 +17,8 @@ import java.util.List;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 public class WordCount {
-
-
-
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
 
         private final static IntWritable one = new IntWritable(1);
@@ -30,11 +28,14 @@ public class WordCount {
 
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-
-            Pattern pattern = Pattern.compile("book.book_edition.(isbn)");
             String riadok = value.toString();
 
-            Matcher matcher = pattern.matcher(riadok);
+            Pattern ISBNpattern = Pattern.compile("book.book_edition.(isbn)");
+            Matcher matcher = ISBNpattern.matcher(riadok);
+
+            Pattern BOOKpattern = Pattern.compile("book.book_edition.book");
+            Matcher BOOKmatcher = BOOKpattern.matcher(riadok);
+
 
             if (matcher.find()) {
                 try {
@@ -44,7 +45,15 @@ public class WordCount {
                 } catch (Exception e) {
                     System.out.println(e);
                 }
+            }
+            else if(BOOKmatcher.find()){
+                try {
+                    documentWord = new Text(getID(value, false));
+                    context.write(documentWord, one);
 
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
             }
 
         }
@@ -78,7 +87,7 @@ public class WordCount {
             File idFile = new File(conf.get("idFile"));
 
             String ID = getID(value, true);
-
+            //System.out.println(value);
             if (!ID.equals(badID)) {
                 if (flagBookHere && ID.equals(foundID)) {
                     attributeValue = importantAttribute(value);
@@ -94,8 +103,21 @@ public class WordCount {
                             if (matcher.find())
                                 splittedAtr[2] = matcher.group(0);
 
-                            if (attributeValue == 1)
-                                listAttributes[0] = "Meno: " + splittedAtr[2] + " <?!?>";
+                            if (attributeValue == 1){
+                                Pattern httpPattern = Pattern.compile("https://");
+                                Matcher httpmatcher = httpPattern.matcher(splittedAtr[2]);
+
+                                if(splittedAtr[2].equals("\\")){ //singapore if statement
+                                    listAttributes[0] = null;
+                                }
+                                else{
+                                    if(httpmatcher.find())
+                                        listAttributes[0] = null;
+                                    else
+                                        listAttributes[0] = "Meno: " + splittedAtr[2] + " <?!?>";
+                                }
+
+                            }
                             else if (attributeValue == 4)
                                 listAttributes[3] = "ISBN: " +splittedAtr[2]+ " <?!?>";
                             else if (attributeValue == 8)
@@ -138,26 +160,27 @@ public class WordCount {
                 } else {
                     if(notEmpty){
 
-                        if(listAttributes[0] == null)
+                        if(listAttributes[0] == null){
                             hasName = false;
+                        }
+                        else{
+                            if(listAttributes[1] == null)
+                                listAttributes[1] = "Autor: NOT_FOUND <?!?>";
 
-                        if(listAttributes[1] == null)
-                            listAttributes[1] = "Autor: NOT_FOUND <?!?>";
+                            if(listAttributes[2] == null)
+                                listAttributes[2] = "Rok vydania: NOT_FOUND <?!?>";
 
-                        if(listAttributes[2] == null)
-                            listAttributes[2] = "Rok vydania: NOT_FOUND <?!?>";
+                            if(listAttributes[3] == null)
+                                listAttributes[3] = "ISBN: NOT_FOUND <?!?>";
 
-                        if(listAttributes[3] == null)
-                            listAttributes[3] = "ISBN: NOT_FOUND <?!?>";
+                            for(int i = 0; i < pocetAtributov; i++)
+                                x = x + listAttributes[i];
 
-                        for(int i = 0; i < pocetAtributov; i++)
-                            x = x + listAttributes[i];
+                            for(int i = 0; i < pocetAtributov; i++) // vycistit pole
+                                listAttributes[i] = null;
 
-                        for(int i = 0; i < pocetAtributov; i++) // vycistit pole
-                            listAttributes[i] = null;
-
-                        if(hasName){
                             x = x.replaceAll("null", "");
+                            //System.out.println(x);
                             context.write(new Text(x), one);
                         }
                         hasName = true;
@@ -178,6 +201,7 @@ public class WordCount {
                                 badID = null;
                                 break;
                             }
+                            //br.close();
                         }
                     } catch (Exception e) {
                         System.out.println(e);
@@ -192,6 +216,7 @@ public class WordCount {
 
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             int sum = 0;
+            //ystem.out.println("HERE   "+key);
             for (IntWritable val : values) {
                 sum += val.get();
             }
@@ -241,7 +266,6 @@ public class WordCount {
         Matcher matcherISBN = ISBN.matcher(stringValue);
         if(matcherISBN.find())
             return 4;
-
         Pattern author = Pattern.compile("media_common\\.*creative_work\\.*credit>");
         Matcher matcherAuthor = author.matcher(stringValue);
         if(matcherAuthor.find())
