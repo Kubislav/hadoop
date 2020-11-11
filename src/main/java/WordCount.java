@@ -277,16 +277,20 @@ public class WordCount {
     public static class getLinks extends Mapper<Object, Text, Text, IntWritable> {
 
         private final static IntWritable one = new IntWritable(1);
-        private Text documentLine = new Text();
-        private Text documentWord = new Text();
+
 
 
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
             Configuration conf = context.getConfiguration();
-            File beforeParseFile = new File(conf.get("beforeParseFile"));
-            context.write(value, one);
+            String sender = null;
+            String line = value.toString();
+            String[] first = line.split("<\\?!\\?>");
+            first[0] = first[0].replaceAll("Meno: ","");
+            //System.out.println(first);
+            sender = "\""+ first[0] + "\" : [{\""+first[1]+"\", \""+first[2]+"\", \""+first[3]+"\"},],";
+            context.write(new Text(sender), one);
         }
     }
 
@@ -338,7 +342,7 @@ public class WordCount {
         System.out.println("Second job done");
 
         Configuration conf3 = new Configuration();
-        conf3.set("beforeParseFile", args[5]);
+        conf3.set("parsedFile", args[5]);
 
         Job job3 = Job.getInstance(conf3, "getLinks");
         job3.setJarByClass(WordCount.class);
@@ -347,7 +351,7 @@ public class WordCount {
         job3.setReducerClass(LinksReducer.class);
         job3.setOutputKeyClass(Text.class);
         job3.setOutputValueClass(IntWritable.class);
-        FileInputFormat.addInputPath(job3, new Path(args[0]));
+        FileInputFormat.addInputPath(job3, new Path(args[5]));
         FileOutputFormat.setOutputPath(job3, new Path(args[3]));
         System.exit(job3.waitForCompletion(true) ? 0 : 1);
 
