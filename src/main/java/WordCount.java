@@ -19,6 +19,8 @@ public class WordCount {
 
 
     static HashSet<String> hashIDset = new HashSet<String>();
+    static public boolean writeID = true;
+    static public boolean jsonShit = true;
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
 
@@ -81,10 +83,26 @@ public class WordCount {
 
             //StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
 
-            Configuration conf = context.getConfiguration();
-            File idFile = new File(conf.get("idFile"));
+            if (writeID){
+                Configuration conf = context.getConfiguration();
+                File idFile = new File(conf.get("idFile"));
+                FileSystem fileSystem = FileSystem.get(conf);
+                Path id_file = new Path(String.valueOf(idFile));
+                String currLine = "";
 
-            String ID = getID(value, true);
+                try(BufferedReader br = new BufferedReader(new InputStreamReader(fileSystem.open(id_file)))){
+                    while((currLine = br.readLine()) != null){
+                        String[] tmpID = currLine.split("\t");
+                        hashIDset.add(tmpID[0]);
+                    }
+                }
+
+                writeID = false;
+            }
+
+
+
+            String ID = getID(value, false);
             //System.out.println(value);
             if (!ID.equals(badID)) {
                 if (flagBookHere && ID.equals(foundID)) {
@@ -189,23 +207,12 @@ public class WordCount {
                     byteValue = 0;
                     attributeValue = 0;
                     x = null;
-                    flagBookHere = false;
+                    flagBookHere = notEmpty =false;
                     badID = ID;
-                    notEmpty = false;
-                    //hashIDset.contains(ID);
-                    try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            if (line.equals(ID)) {
-                                flagBookHere = true;
-                                foundID = ID;
-                                badID = null;
-                                break;
-                            }
-                            //br.close();
-                        }
-                    } catch (Exception e) {
-                        System.out.println(e);
+                    if(hashIDset.contains(ID)){
+                        flagBookHere = true;
+                        foundID = ID;
+                        badID = null;
                     }
                 }
             }
@@ -279,9 +286,6 @@ public class WordCount {
 
         private final static IntWritable one = new IntWritable(1);
 
-
-
-
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
             Configuration conf = context.getConfiguration();
@@ -290,7 +294,7 @@ public class WordCount {
             String[] first = line.split("<\\?!\\?>");
             first[0] = first[0].replaceAll("Meno: ","");
             //System.out.println(first);
-            sender = "{"+ first[0] + ": [{"+first[1]+", "+first[2]+", "+first[3]+"},],},";
+            sender = "{"+ first[0] + ": [{"+first[1]+", "+first[2]+", "+first[3]+"}]},";
             context.write(new Text(sender), NullWritable.get());
         }
     }
