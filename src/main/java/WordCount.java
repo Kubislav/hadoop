@@ -1,6 +1,8 @@
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -8,24 +10,20 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.io.*;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class WordCount {
+
+
+    static HashSet<String> hashIDset = new HashSet<String>();
+
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
 
         private final static IntWritable one = new IntWritable(1);
-        private Text documentLine = new Text();
         private Text documentWord = new Text();
-        public List<StringTokenizer> listName = new ArrayList<>(25);
-
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String riadok = value.toString();
@@ -114,14 +112,14 @@ public class WordCount {
                                     if(httpmatcher.find())
                                         listAttributes[0] = null;
                                     else
-                                        listAttributes[0] = "Meno: " + splittedAtr[2] + " <?!?>";
+                                        listAttributes[0] = "\""+splittedAtr[2]+"\""+ " <?!?>";
                                 }
 
                             }
                             else if (attributeValue == 4)
-                                listAttributes[3] = "ISBN: " +splittedAtr[2]+ " <?!?>";
+                                listAttributes[3] = "\"ISBN\": " +"\""+splittedAtr[2]+"\""+ " <?!?>";
                             else if (attributeValue == 8)
-                                listAttributes[1] = "Autor: " +splittedAtr[2]+ " <?!?>";
+                                listAttributes[1] = "\"Autor\": " +"\""+splittedAtr[2]+"\""+ " <?!?>";
                             notEmpty = true;
 
                         }else{
@@ -152,7 +150,7 @@ public class WordCount {
                                 splittedAtr[2] = splittedAtr[2].substring(0,4) + "-19"+ splittedAtr[2].substring(5,7);
                             }
 
-                            listAttributes[2] = "Rok vydania: " +splittedAtr[2]+ " <?!?>";
+                            listAttributes[2] = "\"Rok vydania\": " +"\""+splittedAtr[2]+"\""+ " <?!?>";
                             notEmpty = true;
                         }
                     }
@@ -165,13 +163,13 @@ public class WordCount {
                         }
                         else{
                             if(listAttributes[1] == null)
-                                listAttributes[1] = "Autor: NOT_FOUND <?!?>";
+                                listAttributes[1] = "\"Autor\""+":"+"\" NOT_FOUND\" <?!?>";
 
                             if(listAttributes[2] == null)
-                                listAttributes[2] = "Rok vydania: NOT_FOUND <?!?>";
+                                listAttributes[2] = "\"Rok vydania\""+":"+"\" NOT_FOUND\" <?!?>";
 
                             if(listAttributes[3] == null)
-                                listAttributes[3] = "ISBN: NOT_FOUND <?!?>";
+                                listAttributes[3] = "\"ISBN\""+":"+"\" NOT_FOUND\" <?!?>";
 
                             for(int i = 0; i < pocetAtributov; i++)
                                 x = x + listAttributes[i];
@@ -180,6 +178,8 @@ public class WordCount {
                                 listAttributes[i] = null;
 
                             x = x.replaceAll("null", "");
+                            x = x.replaceAll("\\\\", "");
+                            x = x.replaceAll("\\\\\\\\", "");
                             //System.out.println(x);
                             context.write(new Text(x), one);
                         }
@@ -192,6 +192,7 @@ public class WordCount {
                     flagBookHere = false;
                     badID = ID;
                     notEmpty = false;
+                    //hashIDset.contains(ID);
                     try (BufferedReader br = new BufferedReader(new FileReader(idFile))) {
                         String line;
                         while ((line = br.readLine()) != null) {
@@ -274,7 +275,7 @@ public class WordCount {
         return 0;
     }
 
-    public static class getLinks extends Mapper<Object, Text, Text, IntWritable> {
+    public static class getLinks extends Mapper<Object, Text, Text, NullWritable> {
 
         private final static IntWritable one = new IntWritable(1);
 
@@ -289,8 +290,8 @@ public class WordCount {
             String[] first = line.split("<\\?!\\?>");
             first[0] = first[0].replaceAll("Meno: ","");
             //System.out.println(first);
-            sender = "\""+ first[0] + "\" : [{\""+first[1]+"\", \""+first[2]+"\", \""+first[3]+"\"},],";
-            context.write(new Text(sender), one);
+            sender = "{"+ first[0] + ": [{"+first[1]+", "+first[2]+", "+first[3]+"},],},";
+            context.write(new Text(sender), NullWritable.get());
         }
     }
 
@@ -325,13 +326,26 @@ public class WordCount {
 
         System.out.println("First job done");
 
+        FileSystem fileSystem = FileSystem.get(conf);
+        Path path = new Path(args[4]);
+        String currentLine = "";
+        try (BufferedReader br = new BufferedReader (new InputStreamReader(fileSystem.open(path)))){
+            while((currentLine = br.readLine()) != null){
+                String[] tmpID = currentLine.split("\t");
+                hashIDset.add(tmpID[0]);
+            }
+        }
+        catch (Exception e){
+            System.out.println(e);
+        }
+
         Configuration conf2 = new Configuration();
         conf2.set("idFile", args[4]);
 
         Job job2 = Job.getInstance(conf2, "FindBooks");
         job2.setJarByClass(WordCount.class);
         job2.setMapperClass(FindBooks.class);
-        //job2.setCombinerClass(BooksReducer.class); //
+        //job2.setCombinerClass(BooksReducer.class);
         job2.setReducerClass(BooksReducer.class);
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(IntWritable.class);
@@ -347,10 +361,10 @@ public class WordCount {
         Job job3 = Job.getInstance(conf3, "getLinks");
         job3.setJarByClass(WordCount.class);
         job3.setMapperClass(getLinks.class);
-        //job2.setCombinerClass(BooksReducer.class); //
-        job3.setReducerClass(LinksReducer.class);
+        //job2.setCombinerClass(BooksReducer.class);
+        //job3.setReducerClass(LinksReducer.class);
         job3.setOutputKeyClass(Text.class);
-        job3.setOutputValueClass(IntWritable.class);
+        job3.setOutputValueClass(NullWritable.class);
         FileInputFormat.addInputPath(job3, new Path(args[5]));
         FileOutputFormat.setOutputPath(job3, new Path(args[3]));
         System.exit(job3.waitForCompletion(true) ? 0 : 1);
