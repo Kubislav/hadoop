@@ -20,7 +20,6 @@ public class WordCount {
 
     static HashSet<String> hashIDset = new HashSet<String>();
     static public boolean writeID = true;
-    static public boolean jsonShit = true;
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
 
@@ -75,13 +74,10 @@ public class WordCount {
         public String badID = null;
         String x = null;
         int attributeValue = 0;
-        int byteValue = 0;
         boolean notEmpty = false;
         boolean hasName = true;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-
-            //StringTokenizer wordsFromLine = new StringTokenizer(value.toString(), "\t", false);
 
             if (writeID){
                 Configuration conf = context.getConfiguration();
@@ -103,12 +99,11 @@ public class WordCount {
 
 
             String ID = getID(value, false);
-            //System.out.println(value);
+
             if (!ID.equals(badID)) {
                 if (flagBookHere && ID.equals(foundID)) {
                     attributeValue = importantAttribute(value);
                     if(attributeValue != 0){
-                        byteValue += attributeValue;
                         String parsed = value.toString();
                         String[] splittedAtr = parsed.split("\t");
 
@@ -123,14 +118,14 @@ public class WordCount {
                                 Pattern httpPattern = Pattern.compile("https://");
                                 Matcher httpmatcher = httpPattern.matcher(splittedAtr[2]);
 
-                                if(splittedAtr[2].equals("\\")){ //singapore if statement
+                                if(splittedAtr[2].equals("\\")){ 
                                     listAttributes[0] = null;
                                 }
                                 else{
                                     if(httpmatcher.find())
                                         listAttributes[0] = null;
                                     else
-                                        listAttributes[0] = "\""+splittedAtr[2]+"\""+ " <?!?>";
+                                        listAttributes[0] = "\"Meno\": " + "\""+splittedAtr[2]+"\""+ " <?!?>";
                                 }
 
                             }
@@ -198,13 +193,11 @@ public class WordCount {
                             x = x.replaceAll("null", "");
                             x = x.replaceAll("\\\\", "");
                             x = x.replaceAll("\\\\\\\\", "");
-                            //System.out.println(x);
                             context.write(new Text(x), one);
                         }
                         hasName = true;
                     }
 
-                    byteValue = 0;
                     attributeValue = 0;
                     x = null;
                     flagBookHere = notEmpty =false;
@@ -224,7 +217,7 @@ public class WordCount {
 
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             int sum = 0;
-            //ystem.out.println("HERE   "+key);
+
             for (IntWritable val : values) {
                 sum += val.get();
             }
@@ -245,21 +238,10 @@ public class WordCount {
         return ID;
     }
 
-    public static String getID(String value, boolean extraTab){
-        String riadok = value.toString();
-        String[] first = riadok.split("\t");
-        String[] second = first[0].split("/");
-        String ID = second[4].substring(0, second[4].length() - 1);
-
-        if(extraTab)
-            ID = ID + "\t1";
-
-        return ID;
-    }
 
     public static int importantAttribute(Text value){
         String stringValue = value.toString();
-        //MENO KNIHY
+
         Pattern menoKnihy = Pattern.compile("type\\.*object\\.*name>");
         Matcher matcherMeno = menoKnihy.matcher(stringValue);
         if(matcherMeno.find())
@@ -274,6 +256,7 @@ public class WordCount {
         Matcher matcherISBN = ISBN.matcher(stringValue);
         if(matcherISBN.find())
             return 4;
+
         Pattern author = Pattern.compile("media_common\\.*creative_work\\.*credit>");
         Matcher matcherAuthor = author.matcher(stringValue);
         if(matcherAuthor.find())
@@ -284,17 +267,13 @@ public class WordCount {
 
     public static class getLinks extends Mapper<Object, Text, Text, NullWritable> {
 
-        private final static IntWritable one = new IntWritable(1);
-
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 
-            Configuration conf = context.getConfiguration();
-            String sender = null;
+            String sender;
             String line = value.toString();
             String[] first = line.split("<\\?!\\?>");
-            first[0] = first[0].replaceAll("Meno: ","");
-            //System.out.println(first);
-            sender = "{"+ first[0] + ": [{"+first[1]+", "+first[2]+", "+first[3]+"}]},";
+            //first[0] = first[0].replaceAll("Meno: ","");
+            sender = "{"+ first[0] + ","+first[1]+", "+first[2]+", "+first[3]+"},";
             context.write(new Text(sender), NullWritable.get());
         }
     }
@@ -316,11 +295,9 @@ public class WordCount {
     public static void main(String[] args) throws Exception {
         //prvy job
         Configuration conf = new Configuration();
-        //conf.set("dfs.block.size", "41943040");
         Job job = Job.getInstance(conf, "FindIDs");
         job.setJarByClass(WordCount.class);
         job.setMapperClass(TokenizerMapper.class);
-        //job.setCombinerClass(IntSumReducer.class);
         job.setReducerClass(IntSumReducer.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(IntWritable.class);
@@ -330,18 +307,6 @@ public class WordCount {
 
         System.out.println("First job done");
 
-        FileSystem fileSystem = FileSystem.get(conf);
-        Path path = new Path(args[4]);
-        String currentLine = "";
-        try (BufferedReader br = new BufferedReader (new InputStreamReader(fileSystem.open(path)))){
-            while((currentLine = br.readLine()) != null){
-                String[] tmpID = currentLine.split("\t");
-                hashIDset.add(tmpID[0]);
-            }
-        }
-        catch (Exception e){
-            System.out.println(e);
-        }
 
         Configuration conf2 = new Configuration();
         conf2.set("idFile", args[4]);
@@ -349,7 +314,6 @@ public class WordCount {
         Job job2 = Job.getInstance(conf2, "FindBooks");
         job2.setJarByClass(WordCount.class);
         job2.setMapperClass(FindBooks.class);
-        //job2.setCombinerClass(BooksReducer.class);
         job2.setReducerClass(BooksReducer.class);
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(IntWritable.class);
@@ -365,8 +329,6 @@ public class WordCount {
         Job job3 = Job.getInstance(conf3, "getLinks");
         job3.setJarByClass(WordCount.class);
         job3.setMapperClass(getLinks.class);
-        //job2.setCombinerClass(BooksReducer.class);
-        //job3.setReducerClass(LinksReducer.class);
         job3.setOutputKeyClass(Text.class);
         job3.setOutputValueClass(NullWritable.class);
         FileInputFormat.addInputPath(job3, new Path(args[5]));
